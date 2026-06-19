@@ -37,8 +37,8 @@
       roscTime: null,
       // decisão de término
       term: { shockable: null, pocus: null, etco2: '' },
-      // metrônomo de compressões
-      metronome: { on: false, bpm: 110 },
+      // metrônomo de compressões (liga automaticamente ao iniciar o código)
+      metronome: { on: true, bpm: 110 },
       // alertas já disparados (para não repetir beep/voz)
       flags: { cycleOver: false, epiDue: false, causeNudge: 0, chargeSaid: false }
     };
@@ -117,7 +117,7 @@
   }
   function setBpm(v) {
     if (!state) return;
-    v = Math.max(80, Math.min(140, Math.round(v)));
+    v = Math.max(100, Math.min(120, Math.round(v)));
     state.metronome.bpm = v;
     renderMetro(); save();
   }
