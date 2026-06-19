@@ -54,6 +54,11 @@ Exemplos:
 - 🔌 **Funciona offline** — via service worker, após o primeiro carregamento.
 - 📳 **Feedback tátil** (vibração) a cada toque, quando suportado.
 - 🎨 **Classificação por cores** em tempo real.
+- 🕑 **Histórico das últimas medições** — ao finalizar, cada medição (FR,
+  classificação, contagem, tempo e data/hora) é salva localmente no aparelho
+  (até 50 registros). Acesse pelo link **Histórico**; pode ser limpo a qualquer
+  momento. Os dados ficam apenas no dispositivo (localStorage), não são enviados
+  a nenhum servidor.
 - ⚡ Resposta instantânea no toque (pointer events).
 
 ## Tecnologia
@@ -81,6 +86,21 @@ python3 -m http.server 8080
 
 **Publicação gratuita:** GitHub Pages, Netlify, Vercel ou Cloudflare Pages —
 basta apontar para a raiz do repositório.
+
+### GitHub Pages (automático)
+
+O repositório inclui o workflow `.github/workflows/deploy-pages.yml`, que publica
+o app automaticamente no GitHub Pages a cada push na branch `main`.
+
+Para ativar:
+
+1. Em **Settings → Pages**, defina **Source** como **GitHub Actions**.
+2. Faça merge deste app na branch `main` (o workflow roda no push para `main`).
+3. O site ficará disponível em `https://<usuario>.github.io/<repositorio>/`.
+
+> O workflow tenta habilitar o Pages automaticamente (`enablement: true`). Por
+> padrão, o ambiente `github-pages` só permite deploy a partir da branch padrão
+> (`main`), por isso o app precisa estar em `main` para ir ao ar.
 
 **Instalar no celular:** abra a URL no navegador (Chrome/Safari) e escolha
 *"Adicionar à tela inicial"*.

@@ -187,13 +187,20 @@
     .state-crit .value { color: var(--red-l); }
 
     /* Reference modal */
+    .links {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 0 8px;
+    }
+    .links .sep { color: var(--muted); font-size: .72rem; }
     .ref-link {
       text-align: center;
-      padding: 0 0 8px;
       font-size: .72rem;
       color: var(--muted);
       text-decoration: underline;
-      background: none; border: none; width: 100%;
+      background: none; border: none;
     }
     dialog {
       border: none;
@@ -213,6 +220,24 @@
     .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align: middle; }
     .ref-body .disc { color: var(--muted); font-size: .72rem; margin-top: 8px; }
     .ref-close { margin: 8px 18px 18px; width: calc(100% - 36px); padding: 12px; border-radius: 12px; border: none; background: var(--accent); color:#fff; font-weight:600; font-size:.9rem; }
+
+    /* History */
+    .hist-list { list-style: none; margin: 0; padding: 4px 18px; max-height: 50vh; overflow-y: auto; }
+    .hist-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .hist-fr {
+      flex: 0 0 auto; min-width: 64px; text-align: center;
+      font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums;
+      border-radius: 10px; padding: 6px 4px; line-height: 1;
+    }
+    .hist-fr small { display:block; font-size:.55rem; font-weight:500; opacity:.8; }
+    .hist-meta { flex: 1; min-width: 0; }
+    .hist-meta .h-label { font-size: .85rem; font-weight: 600; }
+    .hist-meta .h-sub { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+    .hist-empty { padding: 24px 18px; text-align: center; color: var(--muted); font-size: .85rem; }
+    .ref-clear { margin: 4px 18px 0; width: calc(100% - 36px); padding: 11px; border-radius: 12px; border: 1px solid var(--red-l); background: transparent; color: var(--red-l); font-weight:600; font-size:.85rem; }
   </style>
 </head>
 <body>
@@ -254,7 +279,11 @@
       <button id="resetBtn">Zerar</button>
     </div>
 
-    <button class="ref-link" id="refBtn">Ver valores de referência</button>
+    <div class="links">
+      <button class="ref-link" id="histBtn">Histórico</button>
+      <span class="sep">•</span>
+      <button class="ref-link" id="refBtn">Valores de referência</button>
+    </div>
   </div>
 
   <dialog id="refDialog">
@@ -280,6 +309,13 @@
     <button class="ref-close" id="refCloseBtn">Entendi</button>
   </dialog>
 
+  <dialog id="histDialog">
+    <div class="ref-head">Últimas medições</div>
+    <ul class="hist-list" id="histList"></ul>
+    <button class="ref-clear" id="histClearBtn">Limpar histórico</button>
+    <button class="ref-close" id="histCloseBtn">Fechar</button>
+  </dialog>
+
   <script>
     (function () {
       'use strict';
@@ -303,8 +339,60 @@
         resetBtn:  document.getElementById('resetBtn'),
         refBtn:    document.getElementById('refBtn'),
         refDialog: document.getElementById('refDialog'),
-        refClose:  document.getElementById('refCloseBtn')
+        refClose:  document.getElementById('refCloseBtn'),
+        histBtn:    document.getElementById('histBtn'),
+        histDialog: document.getElementById('histDialog'),
+        histList:   document.getElementById('histList'),
+        histClose:  document.getElementById('histCloseBtn'),
+        histClear:  document.getElementById('histClearBtn')
       };
+
+      // ---- Measurement history (localStorage) ----
+      var HIST_KEY = 'fr_history_v1';
+      var HIST_MAX = 50;
+
+      function loadHistory() {
+        try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; }
+        catch (e) { return []; }
+      }
+      function saveHistory(list) {
+        try { localStorage.setItem(HIST_KEY, JSON.stringify(list)); } catch (e) {}
+      }
+      function addHistory(rec) {
+        var list = loadHistory();
+        list.unshift(rec);
+        if (list.length > HIST_MAX) list = list.slice(0, HIST_MAX);
+        saveHistory(list);
+      }
+      function formatWhen(ts) {
+        var d = new Date(ts);
+        var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+        return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() +
+               ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      }
+      function renderHistory() {
+        var list = loadHistory();
+        els.histList.innerHTML = '';
+        if (!list.length) {
+          var li = document.createElement('li');
+          li.className = 'hist-empty';
+          li.textContent = 'Nenhuma medição registrada ainda.';
+          els.histList.appendChild(li);
+          return;
+        }
+        list.forEach(function (r) {
+          var li = document.createElement('li');
+          li.className = 'hist-item';
+          li.innerHTML =
+            '<div class="hist-fr ' + (r.cls || '') + '">' + r.fr + '<small>irpm</small></div>' +
+            '<div class="hist-meta">' +
+              '<div class="h-label">' + r.label + '</div>' +
+              '<div class="h-sub">' + r.count + ' incursões em ' + r.secs.toFixed(1) + 's • ' +
+                formatWhen(r.ts) + '</div>' +
+            '</div>';
+          els.histList.appendChild(li);
+        });
+      }
 
       function nowMs() { return (performance && performance.now) ? performance.now() : Date.now(); }
 
@@ -391,6 +479,21 @@
         if (rafId) cancelAnimationFrame(rafId);
         render();
         els.tapBtn.disabled = true;
+
+        // Persist this measurement to history
+        var secs = elapsedSeconds();
+        var fr = computeFR(secs);
+        if (fr !== null) {
+          var info = classify(fr);
+          addHistory({
+            ts: Date.now(),
+            count: count,
+            secs: secs,
+            fr: Math.round(fr),
+            label: info.label,
+            cls: info.cls
+          });
+        }
       }
 
       function reset() {
@@ -420,6 +523,18 @@
         if (typeof els.refDialog.showModal === 'function') els.refDialog.showModal();
       });
       els.refClose.addEventListener('click', function () { els.refDialog.close(); });
+
+      els.histBtn.addEventListener('click', function () {
+        renderHistory();
+        if (typeof els.histDialog.showModal === 'function') els.histDialog.showModal();
+      });
+      els.histClose.addEventListener('click', function () { els.histDialog.close(); });
+      els.histClear.addEventListener('click', function () {
+        if (confirm('Apagar todo o histórico de medições?')) {
+          saveHistory([]);
+          renderHistory();
+        }
+      });
 
       // Prevent double-tap zoom on iOS for the button region
       document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
