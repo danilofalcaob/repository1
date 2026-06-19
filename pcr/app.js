@@ -37,8 +37,10 @@
       roscTime: null,
       // decisão de término
       term: { shockable: null, pocus: null, etco2: '' },
-      // alertas já disparados (para não repetir beep)
-      flags: { cycleOver: false, epiDue: false, causeNudge: 0 }
+      // metrônomo de compressões
+      metronome: { on: false, bpm: 110 },
+      // alertas já disparados (para não repetir beep/voz)
+      flags: { cycleOver: false, epiDue: false, causeNudge: 0, chargeSaid: false }
     };
   }
 
@@ -76,6 +78,94 @@
   }
   function alertBeep() { beep(988, 0.18); setTimeout(function () { beep(988, 0.18); }, 230); }
   function vibrate(ms) { if (navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
+
+  /* ---------------- Metrônomo de compressões (WebAudio, lookahead) ---------------- */
+  var metroTimer = null;
+  var nextClickTime = 0;
+  function startMetro() {
+    ensureAudio();
+    if (!audioCtx) return;
+    state.metronome.on = true;
+    nextClickTime = audioCtx.currentTime + 0.06;
+    if (metroTimer) clearInterval(metroTimer);
+    metroTimer = setInterval(metroScheduler, 25);
+    renderMetro(); save();
+  }
+  function stopMetro() {
+    if (state) state.metronome.on = false;
+    if (metroTimer) { clearInterval(metroTimer); metroTimer = null; }
+    renderMetro(); if (state) save();
+  }
+  function metroScheduler() {
+    if (!audioCtx || !state || !state.metronome.on) return;
+    var interval = 60 / state.metronome.bpm; // segundos entre compressões
+    while (nextClickTime < audioCtx.currentTime + 0.1) {
+      metroClick(nextClickTime);
+      nextClickTime += interval;
+    }
+  }
+  function metroClick(t) {
+    try {
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'square'; o.frequency.value = 1000;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.4, t + 0.001);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.06);
+    } catch (e) {}
+  }
+  function setBpm(v) {
+    if (!state) return;
+    v = Math.max(80, Math.min(140, Math.round(v)));
+    state.metronome.bpm = v;
+    renderMetro(); save();
+  }
+  function renderMetro() {
+    var b = $('metroBtn');
+    if (!b || !state) return;
+    b.classList.toggle('on', !!state.metronome.on);
+    b.querySelector('.mlabel').textContent = state.metronome.on ? '⏸ Metrônomo' : '▶ Metrônomo';
+    $('metroState').textContent = state.metronome.bpm + '/min';
+  }
+
+  /* ---------------- Voz firme (Web Speech, pt-BR) ---------------- */
+  var ptVoice = null;
+  function pickVoice() {
+    if (!('speechSynthesis' in window)) return null;
+    if (ptVoice) return ptVoice;
+    try {
+      var vs = window.speechSynthesis.getVoices() || [];
+      ptVoice = vs.filter(function (v) { return /pt[-_]?br/i.test(v.lang); })[0]
+        || vs.filter(function (v) { return /^pt/i.test(v.lang); })[0] || null;
+    } catch (e) {}
+    return ptVoice;
+  }
+  if ('speechSynthesis' in window) {
+    try { window.speechSynthesis.onvoiceschanged = function () { ptVoice = null; pickVoice(); }; } catch (e) {}
+  }
+  function speak(text) {
+    if (!state || state.muted) return;
+    if (!('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'pt-BR'; u.rate = 1.0; u.pitch = 0.8; u.volume = 1; // tom firme/grave
+      var v = pickVoice(); if (v) u.voice = v;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function warmSpeech() {
+    // Libera a síntese de voz dentro do gesto do usuário (necessário no iOS)
+    if (!('speechSynthesis' in window)) return;
+    try { var u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = 'pt-BR'; window.speechSynthesis.speak(u); } catch (e) {}
+    pickVoice();
+  }
+  function migrateState() {
+    if (!state.metronome) state.metronome = { on: false, bpm: 110 };
+    if (!state.flags) state.flags = { cycleOver: false, epiDue: false, causeNudge: 0, chargeSaid: false };
+    if (typeof state.flags.chargeSaid === 'undefined') state.flags.chargeSaid = false;
+  }
 
   /* ---------------- Wake lock (manter tela ligada) ---------------- */
   function requestWake() {
@@ -118,12 +208,15 @@
   /* ---------------- Início / recuperação ---------------- */
   function startCode(recovered) {
     if (!recovered) state = blankState();
+    migrateState();
     $('startScreen').classList.add('hidden');
     $('app').style.display = 'flex';
     ensureAudio();
     requestWake();
     buildStaticUI();
     if (!ticker) ticker = setInterval(tick, 250);
+    // retoma o metrônomo se estava ligado na sessão recuperada
+    if (state.metronome.on) { state.metronome.on = false; startMetro(); } else { renderMetro(); }
     tick();
     save();
   }
@@ -163,6 +256,13 @@
     cycleTmr.classList.toggle('alert', cycleRem > 0 && cycleRem <= 15);
     if (cycleRem <= 0 && !state.flags.cycleOver) { state.flags.cycleOver = true; alertBeep(); vibrate([120, 60, 120]); }
     if (cycleRem > 0) state.flags.cycleOver = false;
+
+    // Voz firme: "Carregue as pás" 15 s antes do fim do ciclo (para checagem do ritmo)
+    if (state.rhythm && cycleRem <= 15 && cycleRem > 0 && !state.flags.chargeSaid) {
+      state.flags.chargeSaid = true;
+      speak('Carregue as pás');
+    }
+    if (cycleRem > 16) state.flags.chargeSaid = false;
 
     // Adrenalina
     var epiTmr = $('epiTmr');
@@ -345,7 +445,7 @@
     }
   }
 
-  function newCycle() { state.cycleStart = Date.now(); state.flags.cycleOver = false; save(); }
+  function newCycle() { state.cycleStart = Date.now(); state.flags.cycleOver = false; state.flags.chargeSaid = false; save(); }
 
   function setRhythm(r, shockable) {
     state.rhythm = r; state.shockable = shockable;
@@ -638,6 +738,8 @@
 
   function finalizeCode(outcome) {
     $('endDialog').close();
+    stopMetro();
+    if ('speechSynthesis' in window) try { window.speechSynthesis.cancel(); } catch (e) {}
     state.ended = true;
     state.endTime = Date.now();
     state.outcome = outcome;
@@ -810,6 +912,7 @@
   var uiBuilt = false;
   function buildStaticUI() {
     renderCode();
+    renderMetro();
     buildCauses();
     if (!uiBuilt) {
       buildSpecial();
@@ -824,7 +927,7 @@
 
   /* ---------------- Listeners ---------------- */
   function wire() {
-    $('startBtn').addEventListener('click', function () { ensureAudio(); startCode(false); });
+    $('startBtn').addEventListener('click', function () { ensureAudio(); warmSpeech(); startCode(false); });
     $('indicatorsBtn').addEventListener('click', showIndicators);
     $('aboutBtn').addEventListener('click', function () { $('aboutDialog').showModal(); });
     $('aboutClose').addEventListener('click', function () { $('aboutDialog').close(); });
@@ -836,6 +939,9 @@
       b.addEventListener('click', function () { doAction(b.getAttribute('data-act')); });
     });
     $('compBtn').addEventListener('click', toggleComp);
+    $('metroBtn').addEventListener('click', function () { if (state.metronome.on) stopMetro(); else startMetro(); });
+    $('metroDown').addEventListener('click', function () { setBpm(state.metronome.bpm - 5); });
+    $('metroUp').addEventListener('click', function () { setBpm(state.metronome.bpm + 5); });
     $('roscBtn').addEventListener('click', markRosc);
     $('endBtn').addEventListener('click', endCode);
 
