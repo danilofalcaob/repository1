@@ -1,3 +1,15 @@
+# Aplicativos clínicos (PWA)
+
+Este repositório reúne aplicativos web clínicos (PWA, offline-first):
+
+- **[Manejo de PCR — Copiloto Clínico](pcr/)** (`/pcr/`) — manejo de parada
+  cardiorrespiratória em adultos: timer + loop do ritmo, causas reversíveis
+  (5H/5T), circunstâncias especiais, pós-RCE com cálculo de infusões, apoio à
+  decisão de término, tela compartilhada e debrief com indicadores.
+- **Contador de Frequência Respiratória** (raiz) — descrito abaixo.
+
+---
+
 # Contador de Frequência Respiratória (irpm)
 
 Aplicativo de celular para **contagem da frequência respiratória** de pacientes

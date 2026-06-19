@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#7f1d1d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Manejo PCR" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <title>Manejo de PCR — Copiloto Clínico</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: #161c28;
+      --panel-2: #1f2735;
+      --line: rgba(255,255,255,.08);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #ef4444;        /* red — PCR/urgência */
+      --accent-strong: #b91c1c;
+      --shock: #f97316;         /* chocável */
+      --nonshock: #3b82f6;      /* não-chocável */
+      --green: #16a34a;
+      --green-l: #4ade80;
+      --amber: #f59e0b;
+      --red: #dc2626;
+      --red-l: #f87171;
+      --epi: #a855f7;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; height: 100%; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--text);
+      user-select: none; -webkit-user-select: none;
+    }
+    button { font-family: inherit; }
+    #app { display: flex; flex-direction: column; height: 100dvh;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+
+    /* ---------- Start screen ---------- */
+    #startScreen {
+      position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+      background: radial-gradient(circle at 50% 30%, #1a0f0f, var(--bg));
+      padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+    }
+    #startScreen.hidden { display: none; }
+    .start-head { text-align: center; padding: 22px 6px 4px; }
+    .start-head h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: .3px; }
+    .start-head p { margin: 6px 0 0; font-size: .82rem; color: var(--muted); line-height: 1.4; }
+    .start-main { flex: 1; display: flex; align-items: center; justify-content: center; }
+    #startBtn {
+      width: 100%; max-width: 440px; aspect-ratio: 1/1; max-height: 56vh;
+      border: none; border-radius: 50%;
+      background: radial-gradient(circle at 50% 35%, var(--accent), var(--accent-strong));
+      color: #fff; font-size: 1.4rem; font-weight: 800; letter-spacing: 1px;
+      box-shadow: 0 12px 40px rgba(185,28,28,.5), inset 0 2px 0 rgba(255,255,255,.2);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+      touch-action: manipulation; cursor: pointer;
+    }
+    #startBtn:active { transform: scale(.98); }
+    #startBtn .ic { font-size: 3.2rem; }
+    #startBtn small { font-size: .82rem; font-weight: 600; opacity: .9; letter-spacing: .5px; }
+    .start-foot { display: flex; gap: 10px; padding: 10px 0 18px; justify-content: center; flex-wrap: wrap; }
+    .start-foot button {
+      background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+      border-radius: 12px; padding: 12px 16px; font-size: .85rem; font-weight: 600; cursor: pointer;
+    }
+    .recover-card {
+      background: var(--panel); border: 1px solid var(--amber); border-radius: 14px;
+      padding: 14px; margin: 0 0 8px; font-size: .85rem;
+    }
+    .recover-card .rc-title { font-weight: 700; color: var(--amber); margin-bottom: 8px; }
+    .recover-card .rc-row { display: flex; gap: 10px; }
+    .recover-card button { flex: 1; border-radius: 10px; padding: 12px; font-weight: 700; border: none; cursor: pointer; }
+    .rc-recover { background: var(--green); color: #fff; }
+    .rc-discard { background: transparent; color: var(--red-l); border: 1px solid var(--red-l) !important; }
+
+    /* ---------- Top timers bar ---------- */
+    .timers {
+      display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 6px;
+      padding: 8px 10px 6px;
+    }
+    .tmr { background: var(--panel); border-radius: 12px; padding: 8px 4px; text-align: center; border: 2px solid transparent; }
+    .tmr .tl { font-size: .56rem; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+    .tmr .tv { font-size: 1.5rem; font-weight: 800; line-height: 1.05; margin-top: 1px; font-variant-numeric: tabular-nums; }
+    .tmr .ts { font-size: .56rem; color: var(--muted); }
+    .tmr.total .tv { font-size: 1.7rem; }
+    .tmr.alert { border-color: var(--amber); animation: pulseBorder 1s infinite; }
+    .tmr.over { border-color: var(--red-l); animation: pulseBorder .7s infinite; }
+    .tmr.over .tv { color: var(--red-l); }
+    .tmr.cycle .tv { color: var(--green-l); }
+    .tmr.epi .tv { color: var(--epi); }
+    @keyframes pulseBorder { 0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,.0);} 50% { box-shadow: 0 0 0 3px rgba(245,158,11,.35);} }
+
+    .topbar { display: flex; align-items: center; gap: 8px; padding: 0 12px 4px; }
+    .topbar .rhythm-pill {
+      flex: 1; text-align: center; font-weight: 800; font-size: .9rem; padding: 8px; border-radius: 10px;
+      background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
+    }
+    .topbar .rhythm-pill.shock { background: rgba(249,115,22,.18); color: var(--shock); border-color: var(--shock); }
+    .topbar .rhythm-pill.nonshock { background: rgba(59,130,246,.18); color: var(--nonshock); border-color: var(--nonshock); }
+    .icon-btn {
+      width: 42px; height: 42px; flex: 0 0 auto; border-radius: 11px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--text); font-size: 1.1rem; cursor: pointer;
+    }
+    .icon-btn.active { background: var(--accent); border-color: var(--accent); }
+
+    /* ---------- Push / next-action banner ---------- */
+    .push {
+      margin: 4px 12px; padding: 10px 12px; border-radius: 12px; text-align: center;
+      background: var(--panel); border: 1px solid var(--line); font-weight: 700; font-size: .95rem;
+      min-height: 22px; transition: background .2s, border-color .2s;
+    }
+    .push.urgent { background: rgba(220,38,38,.2); border-color: var(--red-l); color: var(--red-l); animation: pulseBorder .8s infinite; }
+    .push.epi { background: rgba(168,85,247,.18); border-color: var(--epi); color: #d8b4fe; }
+    .push.nudge { background: rgba(245,158,11,.16); border-color: var(--amber); color: var(--amber); }
+    .push small { display: block; font-weight: 500; font-size: .72rem; color: var(--muted); margin-top: 2px; }
+
+    /* ---------- Content / views ---------- */
+    .content { flex: 1; overflow-y: auto; padding: 4px 12px 12px; -webkit-overflow-scrolling: touch; }
+    .view { display: none; }
+    .view.active { display: block; }
+    h2.sec { font-size: .82rem; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 14px 2px 8px; }
+
+    /* rhythm buttons */
+    .rhythm-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .rhythm-grid button {
+      padding: 14px 6px; border-radius: 14px; border: 2px solid var(--line); background: var(--panel);
+      color: var(--text); font-weight: 800; font-size: .92rem; cursor: pointer; line-height: 1.15;
+    }
+    .rhythm-grid button small { display: block; font-weight: 500; font-size: .62rem; color: var(--muted); margin-top: 3px; }
+    .rhythm-grid button.sel-shock { background: rgba(249,115,22,.22); border-color: var(--shock); color: var(--shock); }
+    .rhythm-grid button.sel-nonshock { background: rgba(59,130,246,.22); border-color: var(--nonshock); color: var(--nonshock); }
+
+    /* action grid */
+    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .action-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+    .act {
+      padding: 16px 8px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-2);
+      color: var(--text); font-weight: 700; font-size: .92rem; cursor: pointer; text-align: center; touch-action: manipulation;
+    }
+    .act:active { filter: brightness(1.4); }
+    .act .ic { font-size: 1.3rem; display: block; margin-bottom: 3px; }
+    .act small { display: block; font-weight: 500; font-size: .62rem; color: var(--muted); margin-top: 2px; }
+    .act.shock { background: rgba(249,115,22,.18); border-color: var(--shock); }
+    .act.epi { background: rgba(168,85,247,.16); border-color: var(--epi); }
+    .act.pulse { background: rgba(22,163,74,.16); border-color: var(--green); }
+
+    /* compression toggle */
+    .ccf-row { display: flex; gap: 8px; align-items: stretch; margin-top: 10px; }
+    #compBtn { flex: 1; border-radius: 14px; border: 2px solid var(--green); background: rgba(22,163,74,.18);
+      color: var(--green-l); font-weight: 800; font-size: 1rem; padding: 14px; cursor: pointer; }
+    #compBtn.paused { border-color: var(--red-l); background: rgba(220,38,38,.2); color: var(--red-l); }
+    .ccf-box { flex: 0 0 110px; background: var(--panel); border-radius: 14px; text-align: center; padding: 8px; border: 1px solid var(--line); }
+    .ccf-box .tl { font-size: .56rem; text-transform: uppercase; color: var(--muted); letter-spacing: .6px; }
+    .ccf-box .tv { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .ccf-good { color: var(--green-l); } .ccf-bad { color: var(--amber); }
+
+    /* mini timeline */
+    .mini-tl { margin-top: 6px; }
+    .tl-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: .85rem; }
+    .tl-item .tl-t { flex: 0 0 52px; color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 700; }
+    .tl-item .tl-x { flex: 0 0 22px; text-align: center; }
+    .tl-item .tl-d { flex: 1; }
+    .tl-item .tl-d small { color: var(--muted); }
+    .tl-empty { color: var(--muted); font-size: .85rem; padding: 14px 2px; text-align: center; }
+
+    /* checklist (causes) */
+    .chk { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px; overflow: hidden; }
+    .chk-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; }
+    .chk-head .ck-letter { flex: 0 0 26px; height: 26px; border-radius: 7px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .8rem; }
+    .chk-head .ck-name { flex: 1; font-weight: 700; font-size: .92rem; }
+    .chk-head .ck-name small { display: block; font-weight: 400; font-size: .68rem; color: var(--muted); margin-top: 1px; }
+    .chk-head .ck-status { font-size: .66rem; font-weight: 700; padding: 4px 8px; border-radius: 20px; background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+    .ck-status.considered { background: rgba(59,130,246,.2); color: #93c5fd; }
+    .ck-status.discarded { background: rgba(148,163,184,.2); color: var(--muted); }
+    .ck-status.treating { background: rgba(22,163,74,.22); color: var(--green-l); }
+    .chk-body { padding: 0 14px 12px; display: none; }
+    .chk.open .chk-body { display: block; }
+    .chk-body .conduct { font-size: .82rem; line-height: 1.5; color: #cbd5e1; background: var(--panel-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+    .seg { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .seg button { padding: 10px 4px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: .76rem; font-weight: 700; cursor: pointer; }
+    .seg button.on-considered { background: rgba(59,130,246,.25); border-color: #60a5fa; }
+    .seg button.on-discarded { background: rgba(148,163,184,.25); border-color: var(--muted); }
+    .seg button.on-treating { background: rgba(22,163,74,.3); border-color: var(--green-l); }
+
+    /* special algorithms */
+    .special-list button {
+      width: 100%; text-align: left; padding: 14px; border-radius: 14px; border: 1px solid var(--line);
+      background: var(--panel); color: var(--text); font-weight: 700; font-size: .92rem; margin-bottom: 8px; cursor: pointer;
+    }
+    .special-list button small { display: block; font-weight: 400; font-size: .72rem; color: var(--muted); margin-top: 3px; }
+
+    /* generic card / inputs */
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+    .card h3 { margin: 0 0 4px; font-size: .98rem; }
+    .card p, .card li { font-size: .84rem; line-height: 1.5; color: #cbd5e1; }
+    .card ol, .card ul { margin: 6px 0; padding-left: 20px; }
+    .field { margin-bottom: 10px; }
+    .field label { display: block; font-size: .74rem; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+    .field input, .field select {
+      width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--bg); color: var(--text); font-size: 1rem; -webkit-appearance: none;
+    }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .result-box { background: var(--panel-2); border-radius: 12px; padding: 14px; margin-top: 6px; }
+    .result-box .big { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .result-box .lbl { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .warn { border-color: var(--amber) !important; }
+    .warn-msg { color: var(--amber); font-size: .8rem; font-weight: 600; margin-top: 8px; display: flex; gap: 6px; }
+    .ok-msg { color: var(--green-l); font-size: .8rem; font-weight: 600; margin-top: 8px; }
+    .preset-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .preset-btns button { background: var(--panel-2); border: 1px solid var(--line); color: var(--text); border-radius: 20px; padding: 8px 12px; font-size: .76rem; cursor: pointer; }
+
+    /* post-arrest bundle checklist */
+    .bundle-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .bundle-item .bx { flex: 0 0 26px; height: 26px; border-radius: 8px; border: 2px solid var(--muted); display: flex; align-items: center; justify-content: center; font-size: .9rem; margin-top: 1px; }
+    .bundle-item.done .bx { background: var(--green); border-color: var(--green); color: #fff; }
+    .bundle-item .bt { flex: 1; font-size: .88rem; line-height: 1.4; }
+    .bundle-item.done .bt { color: var(--muted); text-decoration: line-through; }
+    .bundle-item .bt small { display: block; font-size: .72rem; color: var(--muted); text-decoration: none; margin-top: 2px; }
+
+    /* termination panel */
+    .anchor { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .anchor .an-lbl { flex: 1; font-size: .88rem; }
+    .anchor .an-lbl small { display: block; color: var(--muted); font-size: .72rem; }
+    .anchor .an-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .toggle-2 { display: flex; gap: 6px; }
+    .toggle-2 button { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: .78rem; font-weight: 700; cursor: pointer; }
+    .toggle-2 button.on-yes { background: rgba(220,38,38,.25); border-color: var(--red-l); color: var(--red-l); }
+    .toggle-2 button.on-no { background: rgba(22,163,74,.22); border-color: var(--green-l); color: var(--green-l); }
+    .term-note { background: rgba(245,158,11,.1); border: 1px solid var(--amber); border-radius: 12px; padding: 12px; font-size: .8rem; color: #fcd34d; margin-top: 12px; line-height: 1.5; }
+
+    /* bottom nav */
+    .bottom-nav { display: flex; border-top: 1px solid var(--line); background: var(--panel);
+      padding-bottom: env(safe-area-inset-bottom); }
+    .bottom-nav button {
+      flex: 1; background: none; border: none; color: var(--muted); padding: 8px 2px 6px;
+      font-size: .62rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    }
+    .bottom-nav button .ic { font-size: 1.25rem; }
+    .bottom-nav button.active { color: var(--accent); }
+    .bottom-nav button .badge { position: relative; }
+    .bottom-nav button .badge::after { content: attr(data-badge); position: absolute; top: -4px; right: -10px;
+      background: var(--amber); color: #000; font-size: .55rem; font-weight: 800; border-radius: 8px; padding: 0 4px; display: none; }
+    .bottom-nav button .badge.show::after { display: block; }
+
+    /* primary danger button */
+    .end-btn { width: 100%; margin-top: 14px; padding: 16px; border-radius: 14px; border: 1px solid var(--red-l);
+      background: transparent; color: var(--red-l); font-weight: 800; font-size: .95rem; cursor: pointer; }
+    .rosc-btn { width: 100%; margin-top: 10px; padding: 16px; border-radius: 14px; border: none;
+      background: var(--green); color: #fff; font-weight: 800; font-size: 1rem; cursor: pointer; }
+
+    /* dialogs */
+    dialog { border: none; border-radius: 18px; background: var(--panel); color: var(--text); max-width: 460px; width: 92%; padding: 0; max-height: 88dvh; }
+    dialog::backdrop { background: rgba(0,0,0,.7); }
+    .dlg-head { padding: 16px 18px 6px; font-weight: 800; font-size: 1.05rem; }
+    .dlg-body { padding: 0 18px 10px; font-size: .86rem; line-height: 1.55; overflow-y: auto; }
+    .dlg-body ol, .dlg-body ul { padding-left: 20px; }
+    .dlg-body li { margin: 5px 0; color: #d7dee8; }
+    .dlg-actions { display: flex; gap: 10px; padding: 8px 18px 18px; }
+    .dlg-actions button { flex: 1; padding: 13px; border-radius: 12px; border: none; font-weight: 700; font-size: .9rem; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--line) !important; }
+    .btn-danger { background: var(--red); color: #fff; }
+    textarea { width: 100%; min-height: 80px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 1rem; font-family: inherit; resize: vertical; }
+
+    /* shared screen overlay */
+    #sharedScreen { position: fixed; inset: 0; z-index: 60; background: #000; display: none; flex-direction: column;
+      align-items: center; justify-content: center; padding: 20px; text-align: center; }
+    #sharedScreen.show { display: flex; }
+    #sharedScreen .ss-rhythm { font-size: 6vw; font-weight: 800; letter-spacing: 2px; color: var(--muted); }
+    #sharedScreen .ss-cycle { font-size: 34vw; font-weight: 900; line-height: .9; font-variant-numeric: tabular-nums; }
+    #sharedScreen .ss-next { font-size: 7vw; font-weight: 800; margin-top: 2vh; padding: 0 4vw; }
+    #sharedScreen .ss-sub { display: flex; gap: 8vw; margin-top: 4vh; color: var(--muted); font-size: 4.5vw; }
+    #sharedScreen .ss-sub b { color: var(--text); font-variant-numeric: tabular-nums; }
+    #sharedScreen.over .ss-cycle { color: var(--red-l); }
+    #ssExit { position: fixed; top: calc(env(safe-area-inset-top) + 10px); right: 16px; width: 46px; height: 46px;
+      border-radius: 50%; background: rgba(255,255,255,.12); color: #fff; border: none; font-size: 1.3rem; cursor: pointer; z-index: 61; }
+
+    /* history / indicators */
+    .hist-item { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+    .hist-item .h-top { display: flex; justify-content: space-between; align-items: baseline; }
+    .hist-item .h-out { font-weight: 800; font-size: .92rem; }
+    .hist-item .h-out.rosc { color: var(--green-l); } .hist-item .h-out.death { color: var(--red-l); }
+    .hist-item .h-date { font-size: .72rem; color: var(--muted); }
+    .hist-item .h-metrics { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: .76rem; color: #cbd5e1; }
+    .hist-item .h-metrics span b { color: var(--text); }
+    .hist-item .h-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .hist-item .h-actions button { flex: 1; padding: 9px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: .76rem; font-weight: 600; cursor: pointer; }
+    .agg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .agg .a-box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; text-align: center; }
+    .agg .a-box .av { font-size: 1.5rem; font-weight: 800; }
+    .agg .a-box .al { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .disclaimer { font-size: .7rem; color: var(--muted); line-height: 1.5; margin-top: 14px; padding: 0 2px 8px; }
+  </style>
+</head>
+<body>
+  <!-- ===================== START SCREEN ===================== -->
+  <div id="startScreen">
+    <div class="start-head">
+      <h1>Manejo de PCR — Adulto</h1>
+      <p>Copiloto clínico de ressuscitação. Um toque inicia o código.</p>
+    </div>
+    <div id="recoverHolder"></div>
+    <div class="start-main">
+      <button id="startBtn">
+        <span class="ic">▶</span>
+        INICIAR CÓDIGO
+        <small>O cronômetro começa imediatamente</small>
+      </button>
+    </div>
+    <div class="start-foot">
+      <button id="indicatorsBtn">📊 Indicadores</button>
+      <button id="aboutBtn">ℹ️ Sobre / Diretrizes</button>
+    </div>
+  </div>
+
+  <!-- ===================== MAIN APP ===================== -->
+  <div id="app" style="display:none">
+    <div class="timers">
+      <div class="tmr total"><div class="tl">Tempo de parada</div><div class="tv" id="tTotal">0:00</div><div class="ts">total</div></div>
+      <div class="tmr cycle" id="cycleTmr"><div class="tl">Ciclo 2 min</div><div class="tv" id="tCycle">2:00</div><div class="ts">p/ checar</div></div>
+      <div class="tmr epi" id="epiTmr"><div class="tl">Adrenalina</div><div class="tv" id="tEpi">--</div><div class="ts">desde dose</div></div>
+    </div>
+
+    <div class="topbar">
+      <div class="rhythm-pill" id="rhythmPill">Ritmo: definir</div>
+      <button class="icon-btn" id="muteBtn" title="Som">🔊</button>
+      <button class="icon-btn" id="shareBtn" title="Tela compartilhada">📺</button>
+    </div>
+
+    <div class="push" id="pushBanner">Selecione o ritmo e inicie o ciclo de compressões.</div>
+
+    <div class="content">
+      <!-- ===== VIEW: CÓDIGO ===== -->
+      <section class="view active" data-view="code">
+        <h2 class="sec">Ritmo atual</h2>
+        <div class="rhythm-grid">
+          <button data-rhythm="FV/TV" data-shock="1">FV / TV<small>chocável</small></button>
+          <button data-rhythm="AESP" data-shock="0">AESP<small>não-chocável</small></button>
+          <button data-rhythm="Assistolia" data-shock="0">Assistolia<small>não-chocável</small></button>
+        </div>
+
+        <div class="ccf-row">
+          <button id="compBtn">COMPRESSÕES<br><span style="font-size:.72rem;font-weight:600" id="compState">em andamento</span></button>
+          <div class="ccf-box"><div class="tl">Fração compressão</div><div class="tv" id="ccfVal">--</div></div>
+        </div>
+
+        <h2 class="sec">Registro rápido</h2>
+        <div class="action-grid">
+          <button class="act shock" data-act="shock"><span class="ic">⚡</span>Choque<small id="shockCount">0 administrados</small></button>
+          <button class="act epi" data-act="epi"><span class="ic">💉</span>Adrenalina<small id="epiCount">0 doses</small></button>
+          <button class="act" data-act="antiarr"><span class="ic">💊</span>Antiarrítmico<small>amiodarona / lidocaína</small></button>
+          <button class="act pulse" data-act="pulse"><span class="ic">🫀</span>Checar pulso<small>e ritmo</small></button>
+          <button class="act" data-act="airway"><span class="ic">🌬️</span>Via aérea<small>IOT / supraglótico</small></button>
+          <button class="act" data-act="access"><span class="ic">🩸</span>Acesso<small>venoso / IO</small></button>
+          <button class="act" data-act="comment"><span class="ic">📝</span>Comentário<small>livre</small></button>
+          <button class="act" data-act="undo"><span class="ic">↩️</span>Desfazer<small>último evento</small></button>
+        </div>
+
+        <button class="rosc-btn" id="roscBtn">✓ RCE — Retorno da Circulação</button>
+        <button class="end-btn" id="endBtn">Encerrar código</button>
+      </section>
+
+      <!-- ===== VIEW: CAUSAS (5H 5T) ===== -->
+      <section class="view" data-view="causes">
+        <h2 class="sec">Causas reversíveis — 5H e 5T</h2>
+        <div id="causesList"></div>
+        <p class="disclaimer">Marque cada causa como <b>considerada</b>, <b>descartada</b> ou <b>em tratamento</b>. Toque no item para ver a conduta associada.</p>
+      </section>
+
+      <!-- ===== VIEW: ESPECIAIS ===== -->
+      <section class="view" data-view="special">
+        <h2 class="sec">Circunstâncias especiais</h2>
+        <div class="special-list" id="specialList"></div>
+      </section>
+
+      <!-- ===== VIEW: PÓS-RCE ===== -->
+      <section class="view" data-view="post">
+        <h2 class="sec">Bundle pós-parada</h2>
+        <div class="card" style="padding:6px 14px"><div id="bundleList"></div></div>
+
+        <h2 class="sec">Cálculo de infusão — Noradrenalina</h2>
+        <div class="card" id="noraCard">
+          <div class="preset-btns" id="noraPresets"></div>
+          <div class="field-row">
+            <div class="field"><label>Massa do fármaco (mg)</label><input type="number" inputmode="decimal" id="noraMass" placeholder="ex.: 16"></div>
+            <div class="field"><label>Volume total (mL)</label><input type="number" inputmode="decimal" id="noraVol" placeholder="ex.: 250"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Peso (kg)</label><input type="number" inputmode="decimal" id="noraWeight" placeholder="ex.: 70"></div>
+            <div class="field"><label>Dose (mcg/kg/min)</label><input type="number" inputmode="decimal" id="noraDose" placeholder="ex.: 0.1"></div>
+          </div>
+          <div class="result-box" id="noraResult">
+            <div class="lbl">Velocidade de infusão</div>
+            <div class="big"><span id="noraRate">--</span> <span style="font-size:1rem">mL/h</span></div>
+            <div id="noraConc" style="font-size:.78rem;color:var(--muted);margin-top:4px"></div>
+            <div id="noraWarn"></div>
+          </div>
+        </div>
+
+        <h2 class="sec">Cálculo de infusão — Amiodarona</h2>
+        <div class="card" id="amioCard">
+          <div class="preset-btns" id="amioPresets"></div>
+          <div class="field-row">
+            <div class="field"><label>Massa do fármaco (mg)</label><input type="number" inputmode="decimal" id="amioMass" placeholder="ex.: 900"></div>
+            <div class="field"><label>Volume total (mL)</label><input type="number" inputmode="decimal" id="amioVol" placeholder="ex.: 500"></div>
+          </div>
+          <div class="field"><label>Dose desejada (mg/min)</label><input type="number" inputmode="decimal" id="amioDose" placeholder="ex.: 1 (manutenção 6h) → 0.5"></div>
+          <div class="result-box" id="amioResult">
+            <div class="lbl">Velocidade de infusão</div>
+            <div class="big"><span id="amioRate">--</span> <span style="font-size:1rem">mL/h</span></div>
+            <div id="amioConc" style="font-size:.78rem;color:var(--muted);margin-top:4px"></div>
+            <div id="amioWarn"></div>
+          </div>
+        </div>
+        <p class="disclaimer">A checagem de concentração sinaliza diluições implausíveis — erro frequente e potencialmente fatal. Sempre confira a apresentação real do fármaco. Uso adulto.</p>
+      </section>
+
+      <!-- ===== VIEW: TÉRMINO ===== -->
+      <section class="view" data-view="term">
+        <h2 class="sec">Apoio à decisão de término</h2>
+        <div class="card">
+          <div class="anchor"><div class="an-lbl">Duração da parada<small>tempo total de RCP</small></div><div class="an-val" id="termDuration">0:00</div></div>
+          <div class="anchor"><div class="an-lbl">Ritmo chocável<small>presente em algum momento recente?</small></div>
+            <div class="toggle-2" data-term="shockable"><button data-v="yes">Sim</button><button data-v="no">Não</button></div></div>
+          <div class="anchor"><div class="an-lbl">POCUS — contração cardíaca<small>ecografia point-of-care</small></div>
+            <div class="toggle-2" data-term="pocus"><button data-v="yes">Presente</button><button data-v="no">Ausente</button></div></div>
+          <div class="anchor"><div class="an-lbl">EtCO₂ (mmHg)<small>valor lido no monitor — entrada manual</small></div>
+            <input type="number" inputmode="decimal" id="termEtco2" style="width:90px;padding:10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:1rem;text-align:center" placeholder="--"></div>
+        </div>
+        <div class="term-note" id="termSummary"></div>
+        <p class="disclaimer">O aplicativo <b>não decide pelo profissional</b>. Apenas organiza âncoras objetivas para sustentar a decisão de continuar ou suspender a ressuscitação. Considere sempre o contexto, a reversibilidade e os desejos do paciente.</p>
+      </section>
+
+      <!-- ===== VIEW: TIMELINE ===== -->
+      <section class="view" data-view="timeline">
+        <h2 class="sec">Linha do tempo do código</h2>
+        <div class="mini-tl" id="fullTimeline"></div>
+      </section>
+    </div>
+
+    <nav class="bottom-nav">
+      <button class="active" data-nav="code"><span class="ic">⏱️</span>Código</button>
+      <button data-nav="causes"><span class="ic badge" id="causesBadge">🔁</span>Causas</button>
+      <button data-nav="special"><span class="ic">⚕️</span>Especiais</button>
+      <button data-nav="post"><span class="ic">❤️‍🩹</span>Pós-RCE</button>
+      <button data-nav="term"><span class="ic">⚖️</span>Término</button>
+      <button data-nav="timeline"><span class="ic">📋</span>Log</button>
+    </nav>
+  </div>
+
+  <!-- ===================== SHARED SCREEN ===================== -->
+  <div id="sharedScreen">
+    <button id="ssExit">✕</button>
+    <div class="ss-rhythm" id="ssRhythm">—</div>
+    <div class="ss-cycle" id="ssCycle">2:00</div>
+    <div class="ss-next" id="ssNext">COMPRESSÕES</div>
+    <div class="ss-sub">
+      <div>Parada<br><b id="ssTotal">0:00</b></div>
+      <div>Adrenalina<br><b id="ssEpi">--</b></div>
+      <div>FCC<br><b id="ssCcf">--</b></div>
+    </div>
+  </div>
+
+  <!-- ===================== DIALOGS ===================== -->
+  <dialog id="specialDialog">
+    <div class="dlg-head" id="spTitle"></div>
+    <div class="dlg-body" id="spBody"></div>
+    <div class="dlg-actions"><button class="btn-primary" id="spClose">Entendi</button></div>
+  </dialog>
+
+  <dialog id="metaDialog">
+    <div class="dlg-head" id="metaTitle"></div>
+    <div class="dlg-body" id="metaBody"></div>
+    <div class="dlg-actions" id="metaActions"></div>
+  </dialog>
+
+  <dialog id="commentDialog">
+    <div class="dlg-head">Comentário livre</div>
+    <div class="dlg-body"><textarea id="commentText" placeholder="Registrar observação…"></textarea></div>
+    <div class="dlg-actions"><button class="btn-ghost" id="commentCancel">Cancelar</button><button class="btn-primary" id="commentSave">Registrar</button></div>
+  </dialog>
+
+  <dialog id="endDialog">
+    <div class="dlg-head">Encerrar código</div>
+    <div class="dlg-body">
+      <p>Selecione o desfecho do evento:</p>
+      <div class="action-grid" style="margin-top:6px">
+        <button class="act" data-outcome="rosc"><span class="ic">💚</span>RCE sustentado</button>
+        <button class="act" data-outcome="death"><span class="ic">🕊️</span>Óbito</button>
+        <button class="act" data-outcome="transfer"><span class="ic">🚑</span>Transferido<small>em RCP / ECMO</small></button>
+        <button class="act" data-outcome="other"><span class="ic">•••</span>Outro</button>
+      </div>
+    </div>
+    <div class="dlg-actions"><button class="btn-ghost" id="endCancel">Voltar</button></div>
+  </dialog>
+
+  <dialog id="debriefDialog">
+    <div class="dlg-head">Hot debrief — resumo do código</div>
+    <div class="dlg-body" id="debriefBody"></div>
+    <div class="dlg-actions">
+      <button class="btn-ghost" id="debriefPdf">PDF</button>
+      <button class="btn-ghost" id="debriefCsv">CSV</button>
+      <button class="btn-primary" id="debriefClose">Concluir</button>
+    </div>
+  </dialog>
+
+  <dialog id="indicatorsDialog">
+    <div class="dlg-head">Indicadores de qualidade</div>
+    <div class="dlg-body" id="indicatorsBody"></div>
+    <div class="dlg-actions">
+      <button class="btn-danger" id="indClear">Limpar</button>
+      <button class="btn-ghost" id="indCsv">Exportar CSV</button>
+      <button class="btn-primary" id="indClose">Fechar</button>
+    </div>
+  </dialog>
+
+  <dialog id="aboutDialog">
+    <div class="dlg-head">Sobre este aplicativo</div>
+    <div class="dlg-body">
+      <p><b>Manejo de PCR — Adulto</b> é um copiloto clínico para liderança de ressuscitação à beira-leito. Vai além do cronômetro: cobra causas reversíveis, conduz o pós-RCE, apoia a decisão de término e oferece tela compartilhada para o time.</p>
+      <p>Conteúdo clínico alinhado às diretrizes <b>AHA ACLS / ERC</b> e às diretrizes brasileiras de RCP vigentes. <b>Uso exclusivamente adulto.</b></p>
+      <ul>
+        <li>Funciona 100% offline; dados ficam apenas no dispositivo.</li>
+        <li>Recuperação automática do código após fechamento ou crash.</li>
+        <li>Não substitui o julgamento clínico. Sem dosagem pediátrica.</li>
+      </ul>
+      <p class="disclaimer">Ferramenta de apoio à decisão. A responsabilidade clínica é integralmente do profissional. Confira sempre doses, diluições e condutas na fonte oficial.</p>
+    </div>
+    <div class="dlg-actions"><button class="btn-primary" id="aboutClose">Fechar</button></div>
+  </dialog>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>
