@@ -1,0 +1,20 @@
+{
+  "name": "Contador de Frequência Respiratória",
+  "short_name": "FR Contador",
+  "description": "Contador de frequência respiratória (irpm) para classificação de risco em triagem clínica.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a1929",
+  "theme_color": "#0d47a1",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

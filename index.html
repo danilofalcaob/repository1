@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d47a1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FR Contador" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <title>Contador de Frequência Respiratória</title>
+  <style>
+    :root {
+      --bg: #0a1929;
+      --panel: #122842;
+      --panel-2: #0d2036;
+      --accent: #1976d2;
+      --accent-strong: #0d47a1;
+      --text: #e8f1fb;
+      --muted: #8ca6c4;
+      --green: #2e7d32;
+      --green-l: #4caf50;
+      --amber: #f9a825;
+      --red: #c62828;
+      --red-l: #ef5350;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    header {
+      text-align: center;
+      padding: 12px 16px 6px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+    header p {
+      margin: 2px 0 0;
+      font-size: .72rem;
+      color: var(--muted);
+    }
+
+    /* Stats row */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr;
+      gap: 8px;
+      padding: 8px 14px;
+    }
+    .stat {
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 10px 6px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,.05);
+    }
+    .stat .label {
+      font-size: .62rem;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+    }
+    .stat .value {
+      font-size: 1.7rem;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat .unit {
+      font-size: .62rem;
+      color: var(--muted);
+    }
+    .stat.fr {
+      transition: background .25s, border-color .25s;
+      border-width: 2px;
+    }
+    .stat.fr .value { font-size: 2.1rem; }
+
+    /* Big tap button */
+    .tap-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 18px;
+      min-height: 0;
+    }
+    #tapBtn {
+      width: 100%;
+      max-width: 420px;
+      height: 100%;
+      max-height: 380px;
+      border: none;
+      border-radius: 28px;
+      background: radial-gradient(circle at 50% 35%, var(--accent), var(--accent-strong));
+      color: #fff;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(13,71,161,.45), inset 0 1px 0 rgba(255,255,255,.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform .06s ease, filter .12s ease;
+      touch-action: manipulation;
+    }
+    #tapBtn .big-count {
+      font-size: 4.4rem;
+      font-weight: 800;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    #tapBtn .hint { font-size: .9rem; font-weight: 500; opacity: .9; }
+    #tapBtn.pressed { transform: scale(.97); filter: brightness(1.12); }
+    #tapBtn:disabled { opacity: .55; filter: grayscale(.3); }
+
+    /* Controls */
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 4px 14px 14px;
+    }
+    .controls button {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .controls button:active { filter: brightness(1.3); }
+    #finishBtn { background: var(--green); border-color: transparent; }
+    #resetBtn  { background: transparent; }
+
+    /* Classification banner */
+    .class-banner {
+      margin: 0 14px 10px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: .85rem;
+      font-weight: 600;
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,.06);
+      min-height: 20px;
+    }
+    .class-banner small { display:block; font-weight: 400; font-size: .72rem; color: var(--muted); margin-top: 2px; }
+
+    /* color states */
+    .state-normal { background: rgba(46,125,50,.18); border-color: var(--green-l); }
+    .state-normal .value, .state-normal { color: var(--green-l); }
+    .state-warn { background: rgba(249,168,37,.16); border-color: var(--amber); }
+    .state-warn .value { color: var(--amber); }
+    .state-crit { background: rgba(198,40,40,.20); border-color: var(--red-l); }
+    .state-crit .value { color: var(--red-l); }
+
+    /* Reference modal */
+    .ref-link {
+      text-align: center;
+      padding: 0 0 8px;
+      font-size: .72rem;
+      color: var(--muted);
+      text-decoration: underline;
+      background: none; border: none; width: 100%;
+    }
+    dialog {
+      border: none;
+      border-radius: 18px;
+      background: var(--panel);
+      color: var(--text);
+      max-width: 420px;
+      width: 90%;
+      padding: 0;
+    }
+    dialog::backdrop { background: rgba(0,0,0,.6); }
+    .ref-head { padding: 16px 18px 8px; font-weight: 700; font-size: 1rem; }
+    .ref-body { padding: 0 18px 8px; font-size: .82rem; line-height: 1.5; }
+    .ref-body table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+    .ref-body td { padding: 5px 4px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .ref-body td:last-child { text-align: right; color: var(--muted); }
+    .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align: middle; }
+    .ref-body .disc { color: var(--muted); font-size: .72rem; margin-top: 8px; }
+    .ref-close { margin: 8px 18px 18px; width: calc(100% - 36px); padding: 12px; border-radius: 12px; border: none; background: var(--accent); color:#fff; font-weight:600; font-size:.9rem; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Frequência Respiratória</h1>
+      <p>Toque a cada incursão respiratória observada</p>
+    </header>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Toques</div>
+        <div class="value" id="countVal">0</div>
+        <div class="unit">incursões</div>
+      </div>
+      <div class="stat">
+        <div class="label">Tempo</div>
+        <div class="value" id="timeVal">0.0</div>
+        <div class="unit">segundos</div>
+      </div>
+      <div class="stat fr" id="frStat">
+        <div class="label">FR estimada</div>
+        <div class="value" id="frVal">--</div>
+        <div class="unit">irpm</div>
+      </div>
+    </div>
+
+    <div class="class-banner" id="classBanner">Aguardando primeiro toque…</div>
+
+    <div class="tap-wrap">
+      <button id="tapBtn">
+        <span class="big-count" id="bigCount">0</span>
+        <span class="hint" id="tapHint">Toque para iniciar</span>
+      </button>
+    </div>
+
+    <div class="controls">
+      <button id="finishBtn">Finalizar</button>
+      <button id="resetBtn">Zerar</button>
+    </div>
+
+    <button class="ref-link" id="refBtn">Ver valores de referência</button>
+  </div>
+
+  <dialog id="refDialog">
+    <div class="ref-head">Valores de referência — FR (adulto)</div>
+    <div class="ref-body">
+      <table>
+        <tr><td><span class="dot" style="background:var(--red-l)"></span>Bradipneia</td><td>&lt; 12 irpm</td></tr>
+        <tr><td><span class="dot" style="background:var(--green-l)"></span>Normal (eupneia)</td><td>12 – 20 irpm</td></tr>
+        <tr><td><span class="dot" style="background:var(--amber)"></span>Taquipneia leve</td><td>21 – 24 irpm</td></tr>
+        <tr><td><span class="dot" style="background:var(--red-l)"></span>Taquipneia / alerta</td><td>&ge; 25 irpm</td></tr>
+      </table>
+      <p class="disc">
+        Como calcular: a FR é obtida pela proporção
+        <b>(toques ÷ tempo em segundos) × 60</b>.
+        Recomenda-se contar por pelo menos <b>30 segundos</b> para maior precisão.
+        Faixas de referência para <b>adultos</b>; valores pediátricos variam por idade.
+      </p>
+      <p class="disc">
+        Ferramenta de apoio à classificação de risco. Não substitui o julgamento
+        clínico do profissional de saúde.
+      </p>
+    </div>
+    <button class="ref-close" id="refCloseBtn">Entendi</button>
+  </dialog>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var count = 0;
+      var startTime = null;     // ms timestamp of first tap
+      var endTime = null;       // ms timestamp when finalized
+      var finished = false;
+      var rafId = null;
+
+      var els = {
+        tapBtn:    document.getElementById('tapBtn'),
+        bigCount:  document.getElementById('bigCount'),
+        tapHint:   document.getElementById('tapHint'),
+        countVal:  document.getElementById('countVal'),
+        timeVal:   document.getElementById('timeVal'),
+        frVal:     document.getElementById('frVal'),
+        frStat:    document.getElementById('frStat'),
+        banner:    document.getElementById('classBanner'),
+        finishBtn: document.getElementById('finishBtn'),
+        resetBtn:  document.getElementById('resetBtn'),
+        refBtn:    document.getElementById('refBtn'),
+        refDialog: document.getElementById('refDialog'),
+        refClose:  document.getElementById('refCloseBtn')
+      };
+
+      function nowMs() { return (performance && performance.now) ? performance.now() : Date.now(); }
+
+      function elapsedSeconds() {
+        if (startTime === null) return 0;
+        var end = finished ? endTime : nowMs();
+        return (end - startTime) / 1000;
+      }
+
+      // FR = (count / seconds) * 60, proporcional a 60s
+      function computeFR(secs) {
+        if (secs <= 0 || count === 0) return null;
+        return (count / secs) * 60;
+      }
+
+      function classify(fr) {
+        // returns { cls, label, note }
+        if (fr === null) return { cls: '', label: '', note: '' };
+        if (fr < 12)  return { cls: 'state-crit', label: 'Bradipneia', note: 'FR abaixo do esperado' };
+        if (fr <= 20) return { cls: 'state-normal', label: 'Eupneia (normal)', note: 'FR dentro da faixa normal' };
+        if (fr <= 24) return { cls: 'state-warn', label: 'Taquipneia leve', note: 'FR levemente elevada' };
+        return { cls: 'state-crit', label: 'Taquipneia / alerta', note: 'FR elevada — atenção' };
+      }
+
+      function render() {
+        var secs = elapsedSeconds();
+        els.countVal.textContent = count;
+        els.bigCount.textContent = count;
+        els.timeVal.textContent = secs.toFixed(1);
+
+        var fr = computeFR(secs);
+        var info = classify(fr);
+
+        // FR stat coloring
+        els.frStat.className = 'stat fr ' + info.cls;
+        els.frVal.textContent = (fr === null) ? '--' : Math.round(fr);
+
+        // banner
+        els.banner.className = 'class-banner ' + info.cls;
+        if (fr === null) {
+          els.banner.textContent = finished ? 'Sem dados suficientes' : 'Aguardando primeiro toque…';
+        } else {
+          els.banner.innerHTML = info.label +
+            '<small>' + info.note + ' • ' + count + ' incursões em ' + secs.toFixed(1) + 's</small>';
+        }
+
+        // hint
+        if (finished) {
+          els.tapHint.textContent = 'Medição finalizada';
+        } else if (startTime === null) {
+          els.tapHint.textContent = 'Toque para iniciar';
+        } else {
+          els.tapHint.textContent = secs < 30 ? 'Conte por ≥ 30s para mais precisão' : 'Toque a cada respiração';
+        }
+      }
+
+      function loop() {
+        render();
+        if (!finished && startTime !== null) {
+          rafId = requestAnimationFrame(loop);
+        }
+      }
+
+      function handleTap() {
+        if (finished) return;
+        if (startTime === null) {
+          startTime = nowMs();
+          loop();
+        }
+        count++;
+        // haptic feedback if available
+        if (navigator.vibrate) navigator.vibrate(15);
+        // press animation
+        els.tapBtn.classList.add('pressed');
+        render();
+      }
+
+      function endPress() { els.tapBtn.classList.remove('pressed'); }
+
+      function finish() {
+        if (startTime === null || finished) return;
+        finished = true;
+        endTime = nowMs();
+        if (rafId) cancelAnimationFrame(rafId);
+        render();
+        els.tapBtn.disabled = true;
+      }
+
+      function reset() {
+        count = 0;
+        startTime = null;
+        endTime = null;
+        finished = false;
+        if (rafId) cancelAnimationFrame(rafId);
+        els.tapBtn.disabled = false;
+        render();
+      }
+
+      // Use pointer events for responsiveness; fall back to touch/click.
+      // Counting on pointerdown gives the snappiest feel.
+      els.tapBtn.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        handleTap();
+      });
+      els.tapBtn.addEventListener('pointerup', endPress);
+      els.tapBtn.addEventListener('pointerleave', endPress);
+      els.tapBtn.addEventListener('pointercancel', endPress);
+
+      els.finishBtn.addEventListener('click', finish);
+      els.resetBtn.addEventListener('click', reset);
+
+      els.refBtn.addEventListener('click', function () {
+        if (typeof els.refDialog.showModal === 'function') els.refDialog.showModal();
+      });
+      els.refClose.addEventListener('click', function () { els.refDialog.close(); });
+
+      // Prevent double-tap zoom on iOS for the button region
+      document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+
+      render();
+
+      // Register service worker for offline / installable PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('sw.js').catch(function () { /* offline still fine */ });
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
