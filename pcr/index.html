@@ -160,6 +160,18 @@
     .ccf-box .tv { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
     .ccf-good { color: var(--green-l); } .ccf-bad { color: var(--amber); }
 
+    /* metronome */
+    .metro-row { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
+    #metroBtn { flex: 1; border-radius: 14px; border: 2px solid var(--line); background: var(--panel-2);
+      color: var(--text); font-weight: 800; font-size: 1rem; padding: 12px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px; touch-action: manipulation; }
+    #metroBtn.on { border-color: var(--accent); background: rgba(239,68,68,.18); color: #fca5a5; }
+    #metroBtn #metroState { font-size: .72rem; font-weight: 600; color: var(--muted); }
+    #metroBtn.on #metroState { color: #fca5a5; }
+    .metro-adj { flex: 0 0 56px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-2);
+      color: var(--text); font-size: 1.6rem; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+    .metro-adj:active { filter: brightness(1.4); }
+
     /* mini timeline */
     .mini-tl { margin-top: 6px; }
     .tl-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: .85rem; }
@@ -351,12 +363,18 @@
           <div class="ccf-box"><div class="tl">Fração compressão</div><div class="tv" id="ccfVal">--</div></div>
         </div>
 
+        <div class="metro-row">
+          <button id="metroBtn"><span class="mlabel">▶ Metrônomo</span><span id="metroState">110/min</span></button>
+          <button class="metro-adj" id="metroDown" aria-label="Diminuir BPM">−</button>
+          <button class="metro-adj" id="metroUp" aria-label="Aumentar BPM">+</button>
+        </div>
+
         <h2 class="sec">Registro rápido</h2>
         <div class="action-grid">
           <button class="act shock" data-act="shock"><span class="ic">⚡</span>Choque<small id="shockCount">0 administrados</small></button>
           <button class="act epi" data-act="epi"><span class="ic">💉</span>Adrenalina<small id="epiCount">0 doses</small></button>
           <button class="act" data-act="antiarr"><span class="ic">💊</span>Antiarrítmico<small>amiodarona / lidocaína</small></button>
-          <button class="act pulse" data-act="pulse"><span class="ic">🫀</span>Checar pulso<small>e ritmo</small></button>
+          <button class="act pulse" data-act="pulse"><span class="ic">🫀</span>Checar ritmo</button>
           <button class="act" data-act="airway"><span class="ic">🌬️</span>Via aérea<small>IOT / supraglótico</small></button>
           <button class="act" data-act="access"><span class="ic">🩸</span>Acesso<small>venoso / IO</small></button>
           <button class="act" data-act="comment"><span class="ic">📝</span>Comentário<small>livre</small></button>

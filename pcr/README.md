@@ -22,6 +22,10 @@ Uso exclusivamente adulto.** Conteúdo alinhado às diretrizes AHA ACLS / ERC e
     adrenalina, antiarrítmico, checagem de pulso, via aérea, acesso e comentário.
   - **Fração de compressão** calculada automaticamente (toggle de pausa das
     compressões para minimizar tempo "hands-off").
+  - **Metrônomo de compressões** com frequência ajustável (padrão **110/min**,
+    faixa 80–140; passo de 5), para manter o ritmo recomendado de 100–120/min.
+  - **Aviso de voz firme** ("Carregue as pás") **15 s antes** do fim de cada
+    ciclo, antecipando a checagem do ritmo (Web Speech, pt-BR; respeita o mudo).
   - **Empurra a próxima ação** (push) ao usuário em vez de exigir navegação.
   - **Linha do tempo** completa do código, com desfazer do último evento.
 - **Cobrança ativa de causas reversíveis (5H e 5T)** — *nudge* temporizado se
