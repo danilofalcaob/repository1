@@ -162,10 +162,122 @@
     pickVoice();
   }
   function migrateState() {
-    if (!state.metronome) state.metronome = { on: false, bpm: 110 };
+    if (!state.metronome) state.metronome = { on: true, bpm: 110 };
     if (!state.flags) state.flags = { cycleOver: false, epiDue: false, causeNudge: 0, chargeSaid: false };
     if (typeof state.flags.chargeSaid === 'undefined') state.flags.chargeSaid = false;
   }
+
+  /* ---------------- Equipe do plantão (check-in + designação de funções) ---------------- */
+  var TEAM_KEY = 'pcr_team_v1';
+  var ROLES = [
+    { id: 'lider', name: 'Líder' },
+    { id: 'viaAerea', name: 'Via Aérea' },
+    { id: 'comp1', name: 'Compressão - 1º' },
+    { id: 'comp2', name: 'Compressão - 2º' },
+    { id: 'monitor', name: 'Monitorização/Desfibrilação' },
+    { id: 'medicacao', name: 'Medicamentos' }
+  ];
+  var team = null;
+  function todayStr() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+  function defaultTeam() { return { shiftDate: todayStr(), members: [], roles: {} }; }
+  function loadTeam() { try { return JSON.parse(localStorage.getItem(TEAM_KEY)) || defaultTeam(); } catch (e) { return defaultTeam(); } }
+  function saveTeam() { try { localStorage.setItem(TEAM_KEY, JSON.stringify(team)); } catch (e) {} }
+  function memberName(id) { var m = (team.members || []).filter(function (x) { return x.id === id; })[0]; return m ? m.name : null; }
+  function rolesCountFor(id) { var n = 0; ROLES.forEach(function (r) { if (team.roles[r.id] === id) n++; }); return n; }
+
+  function openTeam() {
+    team = loadTeam();
+    $('shiftDate').value = team.shiftDate || todayStr();
+    renderMembers(); renderRoles();
+    $('teamDialog').showModal();
+  }
+  function renderMembers() {
+    var ul = $('memberList'); ul.innerHTML = '';
+    if (!team.members.length) { ul.innerHTML = '<li class="member-empty">Nenhum membro fez check-in ainda.</li>'; return; }
+    team.members.forEach(function (m) {
+      var assigned = ROLES.filter(function (r) { return team.roles[r.id] === m.id; }).map(function (r) { return r.name; });
+      var li = document.createElement('li');
+      li.innerHTML = '<span class="m-name">' + escapeHtml(m.name) + '</span>'
+        + '<span class="m-roles">' + escapeHtml(assigned.join(', ')) + '</span>'
+        + '<button class="m-rm" aria-label="Remover">✕</button>';
+      li.querySelector('.m-rm').onclick = function () {
+        team.members = team.members.filter(function (x) { return x.id !== m.id; });
+        ROLES.forEach(function (r) { if (team.roles[r.id] === m.id) delete team.roles[r.id]; });
+        saveTeam(); renderMembers(); renderRoles();
+      };
+      ul.appendChild(li);
+    });
+  }
+  function addMember() {
+    var name = $('memberName').value.trim();
+    if (!name) return;
+    team.members.push({ id: 'm' + Date.now() + Math.floor(Math.random() * 1000), name: name, checkedInAt: Date.now() });
+    $('memberName').value = '';
+    saveTeam(); renderMembers(); renderRoles();
+  }
+  function renderRoles() {
+    var wrap = $('roleAssign'); wrap.innerHTML = '';
+    ROLES.forEach(function (r) {
+      var row = document.createElement('div'); row.className = 'role-row';
+      var opts = '<option value="">—</option>' + team.members.map(function (m) {
+        return '<option value="' + m.id + '"' + (team.roles[r.id] === m.id ? ' selected' : '') + '>' + escapeHtml(m.name) + '</option>';
+      }).join('');
+      row.innerHTML = '<span class="r-name">' + r.name + '</span><select data-role="' + r.id + '">' + opts + '</select>';
+      var s = row.querySelector('select');
+      s.onchange = function () {
+        var v = s.value;
+        if (v && team.roles[r.id] !== v && rolesCountFor(v) >= 2) {
+          alert(memberName(v) + ' já está em 2 funções. Um membro pode acumular no máximo 2.');
+          s.value = team.roles[r.id] || '';
+          return;
+        }
+        if (v) team.roles[r.id] = v; else delete team.roles[r.id];
+        saveTeam(); renderMembers();
+      };
+      wrap.appendChild(row);
+    });
+  }
+
+  /* ---------------- Código Azul — alarme de acionamento (alto volume) ---------------- */
+  var blueTimer = null;
+  function sirenTone(t, freq, dur) {
+    try {
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.85, t + 0.04);
+      g.gain.setValueAtTime(0.85, t + dur - 0.06);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) {}
+  }
+  function siren() {
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    sirenTone(t, 740, 0.4); sirenTone(t + 0.45, 1100, 0.4);
+    vibrate([300, 120, 300]);
+  }
+  function startBlueAlarm() {
+    ensureAudio();
+    if (!audioCtx || blueTimer) return;
+    siren();
+    blueTimer = setInterval(siren, 1100);
+  }
+  function stopBlueAlarm() { if (blueTimer) { clearInterval(blueTimer); blueTimer = null; } }
+  function renderBaRoles() {
+    var t = loadTeam();
+    var present = (t.members || []).length;
+    var html = ROLES.map(function (r) {
+      var nm = (t.roles[r.id] && memberNameIn(t, t.roles[r.id])) || '—';
+      return '<div class="bar"><span class="bn">' + r.name + '</span><b>' + escapeHtml(nm) + '</b></div>';
+    }).join('');
+    $('baRoles').innerHTML = (present ? '' : '<div class="bar"><span class="bn">Nenhum membro em check-in</span><b>—</b></div>') + html;
+  }
+  function memberNameIn(t, id) { var m = (t.members || []).filter(function (x) { return x.id === id; })[0]; return m ? m.name : null; }
+  function showBlueOverlay() { renderBaRoles(); $('blueAlert').classList.add('show'); }
+  function hideBlueOverlay() { $('blueAlert').classList.remove('show'); }
+  var pendingMetro = false;
 
   /* ---------------- Wake lock (manter tela ligada) ---------------- */
   function requestWake() {
@@ -206,7 +318,7 @@
   }
 
   /* ---------------- Início / recuperação ---------------- */
-  function startCode(recovered) {
+  function startCode(recovered, deferMetro) {
     if (!recovered) state = blankState();
     migrateState();
     $('startScreen').classList.add('hidden');
@@ -215,8 +327,13 @@
     requestWake();
     buildStaticUI();
     if (!ticker) ticker = setInterval(tick, 250);
-    // retoma o metrônomo se estava ligado na sessão recuperada
-    if (state.metronome.on) { state.metronome.on = false; startMetro(); } else { renderMetro(); }
+    // metrônomo: liga automaticamente; quando há Código Azul, adia até entrar no código
+    if (deferMetro) {
+      pendingMetro = !!state.metronome.on;
+      state.metronome.on = false; renderMetro();
+    } else if (state.metronome.on) {
+      state.metronome.on = false; startMetro();
+    } else { renderMetro(); }
     tick();
     save();
   }
@@ -738,6 +855,7 @@
 
   function finalizeCode(outcome) {
     $('endDialog').close();
+    stopBlueAlarm(); hideBlueOverlay();
     stopMetro();
     if ('speechSynthesis' in window) try { window.speechSynthesis.cancel(); } catch (e) {}
     state.ended = true;
@@ -927,10 +1045,30 @@
 
   /* ---------------- Listeners ---------------- */
   function wire() {
-    $('startBtn').addEventListener('click', function () { ensureAudio(); warmSpeech(); startCode(false); });
+    // Código Azul: aciona o alarme de alto volume + inicia o código (metrônomo adiado)
+    $('startBtn').addEventListener('click', function () { ensureAudio(); warmSpeech(); startBlueAlarm(); startCode(false, true); showBlueOverlay(); });
+    $('startPlainBtn').addEventListener('click', function () { ensureAudio(); warmSpeech(); startCode(false, false); });
     $('indicatorsBtn').addEventListener('click', showIndicators);
     $('aboutBtn').addEventListener('click', function () { $('aboutDialog').showModal(); });
     $('aboutClose').addEventListener('click', function () { $('aboutDialog').close(); });
+
+    // Equipe / plantão
+    $('teamSetupBtn').addEventListener('click', openTeam);
+    $('teamBtn').addEventListener('click', openTeam);
+    $('memberAdd').addEventListener('click', addMember);
+    $('memberName').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addMember(); } });
+    $('shiftDate').addEventListener('change', function () { team.shiftDate = $('shiftDate').value; saveTeam(); });
+    $('teamClose').addEventListener('click', function () { saveTeam(); $('teamDialog').close(); });
+    $('teamClear').addEventListener('click', function () {
+      if (confirm('Limpar check-in e designações da equipe?')) { team = defaultTeam(); saveTeam(); renderMembers(); renderRoles(); $('shiftDate').value = team.shiftDate; }
+    });
+
+    // Código Azul — overlay de acionamento
+    $('baSilence').addEventListener('click', stopBlueAlarm);
+    $('baEnter').addEventListener('click', function () {
+      stopBlueAlarm(); hideBlueOverlay();
+      if (pendingMetro) { pendingMetro = false; startMetro(); }
+    });
 
     document.querySelectorAll('.rhythm-grid button').forEach(function (b) {
       b.addEventListener('click', function () { setRhythm(b.getAttribute('data-rhythm'), b.getAttribute('data-shock') === '1'); });
