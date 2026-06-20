@@ -15,6 +15,17 @@ Uso exclusivamente adulto.** Conteúdo alinhado às diretrizes AHA ACLS / ERC e
 
 ## Funcionalidades (MVP)
 
+- **Equipe do plantão (check-in + designação de funções)**
+  - Cada membro faz **check-in** no dispositivo no dia do plantão (lista da
+    equipe presente).
+  - O **líder designa** quem fica em cada função: **Líder, Via Aérea,
+    Compressão - 1º, Compressão - 2º, Monitorização/Desfibrilação,
+    Medicamentos**. Um mesmo membro pode acumular **até 2 funções** (times
+    incompletos). Designações feitas na troca de turno, salvas no dispositivo.
+  - **Código Azul** — ao identificar a parada, o botão dispara um **alarme
+    sonoro de alto volume** (e vibração) e mostra a escalação da equipe por
+    função, acionando o time. *(Ver nota sobre paging multi-dispositivo abaixo.)*
+
 - **Núcleo — timer, loop do ritmo e log**
   - Cronômetro do evento + ciclo de 2 min + intervalo de adrenalina, simultâneos,
     com alertas visuais (alto contraste) e sonoros ao exceder limites.
@@ -59,6 +70,26 @@ Uso exclusivamente adulto.** Conteúdo alinhado às diretrizes AHA ACLS / ERC e
 
 Entrada por voz / hands-free, carregamento de contexto pré-parada (TRR) e
 sincronização em nuvem opcional.
+
+#### Nota — paging multi-dispositivo (acionamento entre celulares)
+
+O alarme do **Código Azul** soa **no dispositivo em que o app está aberto**
+(estação/tablet do carrinho ou tela da sala). Fazer o alarme tocar **nos
+celulares dos demais membros** exige infraestrutura que rompe o modelo
+offline-first:
+
+- **Backend/servidor** sempre ativo (não cabe em GitHub Pages, que é estático)
+  para receber o gatilho e retransmitir à equipe;
+- **Contas/login real** dos membros e agrupamento por unidade/plantão;
+- **Web Push** (VAPID + service worker) para entregar a notificação com o app
+  fechado.
+
+Limitação importante de PWA: navegadores **não garantem um alarme alto com o
+app fechado/bloqueado** — especialmente no **iOS**, onde "critical alerts"
+(tocar mesmo no silencioso) exigem um **app nativo** com permissão especial da
+Apple. Para um pager clínico confiável entre celulares, o caminho é um **app
+nativo + backend com push**. O módulo de equipe e o gatilho do Código Azul aqui
+implementados são a base reutilizável para essa evolução.
 
 ## Princípios de design
 

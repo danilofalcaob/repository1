@@ -1,5 +1,5 @@
 /* Service worker — cache do app shell para uso offline (offline-first) */
-var CACHE = 'pcr-manejo-v3';
+var CACHE = 'pcr-manejo-v4';
 var ASSETS = [
   './',
   './index.html',
