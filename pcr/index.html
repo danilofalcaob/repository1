@@ -291,6 +291,9 @@
     #sharedScreen .ss-sub { display: flex; gap: 8vw; margin-top: 4vh; color: var(--muted); font-size: 4.5vw; }
     #sharedScreen .ss-sub b { color: var(--text); font-variant-numeric: tabular-nums; }
     #sharedScreen.over .ss-cycle { color: var(--red-l); }
+    #sharedScreen .ss-team { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.4vh 4vw; margin-top: 4vh; max-width: 94vw; }
+    #sharedScreen .ss-team .st { font-size: 3vw; color: var(--muted); text-align: center; }
+    #sharedScreen .ss-team .st b { display: block; color: #fff; font-size: 3.4vw; font-weight: 800; }
     #ssExit { position: fixed; top: calc(env(safe-area-inset-top) + 10px); right: 16px; width: 46px; height: 46px;
       border-radius: 50%; background: rgba(255,255,255,.12); color: #fff; border: none; font-size: 1.3rem; cursor: pointer; z-index: 61; }
 
@@ -365,6 +368,7 @@
     <button id="startPlainBtn" class="start-plain">Iniciar sem acionar o alarme</button>
     <div class="start-foot">
       <button id="teamSetupBtn">👥 Equipe / Plantão</button>
+      <button id="pagerBtn">📟 Pager</button>
       <button id="indicatorsBtn">📊 Indicadores</button>
       <button id="aboutBtn">ℹ️ Sobre</button>
     </div>
@@ -523,6 +527,7 @@
       <div>Adrenalina<br><b id="ssEpi">--</b></div>
       <div>FCC<br><b id="ssCcf">--</b></div>
     </div>
+    <div class="ss-team" id="ssTeam"></div>
   </div>
 
   <!-- ===================== CÓDIGO AZUL — overlay de acionamento ===================== -->
@@ -537,6 +542,21 @@
   </div>
 
   <!-- ===================== DIALOGS ===================== -->
+  <dialog id="pagerDialog">
+    <div class="dlg-head">📟 Pager — Web Push (opcional)</div>
+    <div class="dlg-body">
+      <p class="disclaimer" style="margin-top:0">Recurso <b>opcional e online</b>: aciona uma <b>notificação push</b> nos celulares dos membros que ativaram o pager neste mesmo servidor/equipe. Requer um servidor (ver <code>pcr-pager-server</code>). No <b>iOS</b> o som alto com o app fechado <b>não é garantido</b>; veja <code>PAGER.md</code>.</p>
+      <div class="field"><label>URL do servidor do pager</label><input id="pagerUrl" placeholder="https://seu-servidor.exemplo" autocomplete="off"></div>
+      <div class="field"><label>Equipe / unidade (igual para todos)</label><input id="pagerTeam" placeholder="ex.: UTI-A — noturno" autocomplete="off"></div>
+      <div class="field"><label>Seu nome (neste aparelho)</label><input id="pagerName" placeholder="opcional" autocomplete="off"></div>
+      <div id="pagerStatus" class="disclaimer"></div>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn-ghost" id="pagerClose">Fechar</button>
+      <button class="btn-primary" id="pagerEnable">Ativar neste aparelho</button>
+    </div>
+  </dialog>
+
   <dialog id="teamDialog">
     <div class="dlg-head">Equipe do plantão</div>
     <div class="dlg-body">

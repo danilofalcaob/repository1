@@ -1,0 +1,17 @@
+{
+  "name": "pcr-pager-server",
+  "version": "1.0.0",
+  "description": "Servidor de paging (Web Push) para o app de Manejo de PCR — aciona a equipe via Código Azul.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "gen-keys": "web-push generate-vapid-keys"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "web-push": "^3.6.7"
+  }
+}
