@@ -238,6 +238,66 @@
     });
   }
 
+  /* ---------------- Pager Web Push (opcional, online) ---------------- */
+  var PAGER_KEY = 'pcr_pager_v1';
+  function loadPager() { try { return JSON.parse(localStorage.getItem(PAGER_KEY)) || {}; } catch (e) { return {}; } }
+  function savePager(p) { try { localStorage.setItem(PAGER_KEY, JSON.stringify(p)); } catch (e) {} }
+  function urlB64ToUint8(base64) {
+    var padding = '='.repeat((4 - base64.length % 4) % 4);
+    var b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var raw = atob(b64), arr = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  }
+  function openPager() {
+    var p = loadPager();
+    $('pagerUrl').value = p.url || '';
+    $('pagerTeam').value = p.team || '';
+    $('pagerName').value = p.name || '';
+    $('pagerStatus').textContent = p.enabled ? 'Pager ativado neste aparelho ✓ (equipe: ' + (p.team || '') + ')' : 'Pager não ativado neste aparelho.';
+    $('pagerDialog').showModal();
+  }
+  function enablePager() {
+    var url = ($('pagerUrl').value || '').trim().replace(/\/+$/, '');
+    var teamName = ($('pagerTeam').value || '').trim();
+    var name = ($('pagerName').value || '').trim();
+    if (!url || !teamName) { $('pagerStatus').textContent = 'Informe a URL do servidor e a equipe/unidade.'; return; }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      $('pagerStatus').textContent = 'Este navegador não suporta Web Push.'; return;
+    }
+    $('pagerStatus').textContent = 'Ativando…';
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== 'granted') { $('pagerStatus').textContent = 'Permissão de notificação negada.'; return; }
+      return navigator.serviceWorker.ready.then(function (reg) {
+        return fetch(url + '/vapidPublicKey').then(function (r) { return r.text(); }).then(function (pub) {
+          return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8(pub.trim()) });
+        }).then(function (sub) {
+          return fetch(url + '/subscribe', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ team: teamName, name: name, subscription: sub })
+          });
+        }).then(function () {
+          savePager({ url: url, team: teamName, name: name, enabled: true });
+          $('pagerStatus').textContent = 'Pager ativado neste aparelho ✓';
+        });
+      });
+    }).catch(function (e) { $('pagerStatus').textContent = 'Falha ao ativar: ' + (e && e.message ? e.message : e); });
+  }
+  // Dispara o Código Azul para a equipe (não bloqueia o fluxo local).
+  function triggerPager() {
+    var p = loadPager();
+    if (!p.url || !p.team) return;
+    var tm = loadTeam();
+    var roles = ROLES.filter(function (r) { return tm.roles[r.id]; })
+      .map(function (r) { return r.name + ': ' + (memberNameIn(tm, tm.roles[r.id]) || '—'); });
+    try {
+      fetch(p.url + '/page', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team: p.team, by: p.name || '', roles: roles })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
   /* ---------------- Código Azul — alarme de acionamento (alto volume) ---------------- */
   var blueTimer = null;
   function sirenTone(t, freq, dur) {
@@ -800,6 +860,12 @@
     $('ssTotal').textContent = fmt(t);
     $('ssEpi').textContent = state.lastEpi === null ? '--' : fmt((Date.now() - state.lastEpi) / 1000);
     $('ssCcf').textContent = (c === null) ? '--' : Math.round(c) + '%';
+    // escalação da equipe (somente funções designadas)
+    var tm = loadTeam();
+    var assigned = ROLES.filter(function (r) { return tm.roles[r.id]; });
+    $('ssTeam').innerHTML = assigned.map(function (r) {
+      return '<div class="st">' + r.name + '<b>' + escapeHtml(memberNameIn(tm, tm.roles[r.id]) || '—') + '</b></div>';
+    }).join('');
   }
   function toggleShared() {
     var ss = $('sharedScreen');
@@ -1046,7 +1112,7 @@
   /* ---------------- Listeners ---------------- */
   function wire() {
     // Código Azul: aciona o alarme de alto volume + inicia o código (metrônomo adiado)
-    $('startBtn').addEventListener('click', function () { ensureAudio(); warmSpeech(); startBlueAlarm(); startCode(false, true); showBlueOverlay(); });
+    $('startBtn').addEventListener('click', function () { ensureAudio(); warmSpeech(); startBlueAlarm(); triggerPager(); startCode(false, true); showBlueOverlay(); });
     $('startPlainBtn').addEventListener('click', function () { ensureAudio(); warmSpeech(); startCode(false, false); });
     $('indicatorsBtn').addEventListener('click', showIndicators);
     $('aboutBtn').addEventListener('click', function () { $('aboutDialog').showModal(); });
@@ -1055,6 +1121,9 @@
     // Equipe / plantão
     $('teamSetupBtn').addEventListener('click', openTeam);
     $('teamBtn').addEventListener('click', openTeam);
+    $('pagerBtn').addEventListener('click', openPager);
+    $('pagerEnable').addEventListener('click', enablePager);
+    $('pagerClose').addEventListener('click', function () { $('pagerDialog').close(); });
     $('memberAdd').addEventListener('click', addMember);
     $('memberName').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addMember(); } });
     $('shiftDate').addEventListener('change', function () { team.shiftDate = $('shiftDate').value; saveTeam(); });
