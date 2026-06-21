@@ -45,13 +45,34 @@ notifica todos os inscritos daquela equipe.
 
 ## Endpoints
 
-| Método | Rota              | Descrição                                            |
-|-------:|-------------------|------------------------------------------------------|
-| GET    | `/health`         | status + nº de inscrições                            |
-| GET    | `/vapidPublicKey` | chave pública VAPID (texto)                          |
-| POST   | `/subscribe`      | `{ team, name, subscription }`                       |
-| POST   | `/unsubscribe`    | `{ endpoint }`                                       |
-| POST   | `/page`           | `{ team, by?, roles?, message? }` → dispara o push   |
+| Método | Rota               | Descrição                                            |
+|-------:|--------------------|------------------------------------------------------|
+| GET    | `/health`          | status + nº de inscrições/tokens + FCM on/off        |
+| GET    | `/vapidPublicKey`  | chave pública VAPID (texto)                          |
+| POST   | `/subscribe`       | Web Push: `{ team, name, subscription }`             |
+| POST   | `/unsubscribe`     | `{ endpoint }`                                       |
+| POST   | `/registerToken`   | App nativo (FCM): `{ team, name, token, platform }`  |
+| POST   | `/unregisterToken` | `{ token }`                                          |
+| POST   | `/page`            | `{ team, by?, roles?, message? }` → dispara Web Push + FCM |
+
+## FCM (app nativo — alarme crítico)
+
+Para acionar o app nativo (`../pcr-native`) com **alarme crítico** (iOS Critical
+Alerts / Android alarme), habilite o FCM definindo a conta de serviço do
+Firebase:
+
+```bash
+export FIREBASE_SERVICE_ACCOUNT="$(cat caminho/para/serviceAccount.json)"
+npm install            # instala firebase-admin (optionalDependency)
+npm start
+```
+
+Com isso, `POST /page` envia push crítico para os tokens registrados em
+`/registerToken`, além das inscrições Web Push. Se `FIREBASE_SERVICE_ACCOUNT`
+não estiver definido, o servidor funciona só com Web Push (FCM desligado).
+
+> A entrega de critical alert no iOS com o app encerrado exige a entitlement
+> aprovada pela Apple e **deve ser validada em dispositivo real**.
 
 ## Limitações / produção
 

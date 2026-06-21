@@ -1,0 +1,13 @@
+node_modules/
+# Artefatos nativos (gerados por `react-native init` / build)
+ios/Pods/
+ios/build/
+android/.gradle/
+android/app/build/
+android/build/
+*.keystore
+!debug.keystore
+.env
+google-services.json
+GoogleService-Info.plist
+*.log
