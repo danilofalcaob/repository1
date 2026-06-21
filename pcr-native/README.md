@@ -18,13 +18,24 @@ Esqueleto de **React Native** focado no que o PWA **não** garante: tocar um
 
 | Arquivo | Papel |
 |---|---|
-| `App.tsx` | UI: Código Azul, equipe/funções, config do pager |
+| `App.tsx` | shell: tela inicial (Código Azul), navegação por abas, debrief |
 | `index.js` | registra handlers de background (FCM/Notifee) + app |
 | `src/notifications.ts` | alarme crítico (Notifee) + FCM (permissão, canal, display) |
 | `src/pager.ts` | registra token no servidor e dispara o Código Azul |
-| `src/clinicalData.ts` | funções da equipe (igual ao PWA) |
-| `app.json` | nome do app |
-| `package.json` | dependências de referência |
+| `src/useCode.tsx` | **motor do código**: cronômetros, log, fração de compressão, métricas, recuperação |
+| `src/screens.tsx` | telas: Código, Causas (5H/5T), Especiais, Pós-RCE (+infusões), Término, Log, Equipe, Debrief |
+| `src/clinicalData.ts` | conteúdo clínico (5H/5T, algoritmos, bundle, presets) — porte de `pcr/data.js` |
+| `src/format.ts` | formatação de tempo + cálculo de infusões com checagem de concentração |
+| `src/metronome.ts` | metrônomo 100–120/min (Vibration; TODO áudio via lib) |
+| `src/teamStore.ts` | persistência da equipe (check-in + funções) |
+| `app.json` / `package.json` | config e dependências de referência |
+
+Os módulos clínicos do PWA (timer + loop do ritmo, 5H/5T, circunstâncias
+especiais, pós-RCE com infusões, término e debrief com indicadores) já estão
+**portados** em `src/`. Faltam apenas itens que dependem de libs nativas:
+**metrônomo audível** (hoje vibração — ver TODO em `metronome.ts`), **voz
+"Carregue as pás"** (adicionar `react-native-tts`) e **exportação PDF/CSV**
+(ex.: `react-native-share`). A tela compartilhada do PWA não foi portada.
 
 ## Passo a passo
 
